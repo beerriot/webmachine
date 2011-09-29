@@ -21,3 +21,8 @@ edoc:
 test: all
 	@(./rebar skip_deps=true eunit)
 
+graph:
+	escript scripts/wdc_graph.erl \
+	src/webmachine_decision_core.erl \
+	docs/wdc_graph.dot
+	fdp -Tpng -odocs/wdc_graph.png docs/wdc_graph.dot
