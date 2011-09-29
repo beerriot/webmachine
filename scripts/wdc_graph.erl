@@ -62,6 +62,11 @@ find_outcomes([{call, _CallLine,
                |Rest]) ->
     [outcome(True),outcome(False)|find_outcomes(Rest)];
 find_outcomes([{call, _CallLine,
+                {atom, _AtomLine, decision_test_fn},
+                [_Test, _ExpectFun, True, False]}
+               |Rest]) ->
+    [outcome(True),outcome(False)|find_outcomes(Rest)];
+find_outcomes([{call, _CallLine,
                 {atom, _AtomLine, respond},
                 [{integer, _IntegerLine, Integer}]}
                |Rest]) ->
