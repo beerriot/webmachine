@@ -100,6 +100,15 @@ dot(Parse, Filename) ->
                            label(Decision)]))
       || {Decision, _ResourceCalls, _Outcomes} <- Combined ],
 
+    %% decision labels
+    [ Write(io_lib:format("~p_label [label=<~s> shape=none]~n",
+                          [Decision,
+                           string:join(
+                             [atom_to_list(RC) || RC <- ResourceCalls],
+                             "<BR/>")]))
+      || {Decision, ResourceCalls, _Outcomes} <- Combined,
+         ResourceCalls /= [] ],
+
     %% status nodes
     Statuses = lists:usort(
                  lists:append(
@@ -113,6 +122,10 @@ dot(Parse, Filename) ->
     [ [ Write(io_lib:format("~p -> ~p~n", [Decision, O]))
         || O <- Outcomes ]
       || {Decision, _ResourceCalls, Outcomes} <- Combined ],
+    [ Write(io_lib:format("~p_label -> ~p [color=\"#cccccc\"]~n",
+                          [Decision, Decision]))
+      || {Decision, ResourceCalls, _Outcomes} <- Combined,
+         ResourceCalls /= [] ],
 
     Write("}\n"),
     Close().
