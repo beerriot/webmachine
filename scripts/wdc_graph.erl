@@ -127,7 +127,7 @@ dot(Parse, Filename) ->
     [ [ Write(io_lib:format("~p -> ~p~n", [Decision, O]))
         || O <- Outcomes ]
       || {Decision, _ResourceCalls, Outcomes} <- Combined ],
-    [ Write(io_lib:format("~p_label -> ~p [color=\"#cccccc\"]~n",
+    [ Write(io_lib:format("~p_label -> ~p [color=\"#cccccc\" dir=none]~n",
                           [Decision, Decision]))
       || {Decision, ResourceCalls, _Outcomes} <- Combined,
          ResourceCalls /= [] ],
