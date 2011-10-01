@@ -25,29 +25,64 @@ parse(Filename) ->
                        function == element(1, F)],
     {function, _Line, decision, _Arity, DecisionClauses} =
         lists:keyfind(decision, 3, Functions),
-    [ grok_decision_clause(DC) || DC <- DecisionClauses ].
+    [ grok_decision_clause(DC, Functions) || DC <- DecisionClauses ].
 
 grok_decision_clause({clause, _ClauseLine,
                       [{atom, _NameLine, Name}],
                       []=_Guards,
-                      Body}) ->
-    ResourceCalls = find_resource_calls(Body),
+                      Body},
+                     OtherFunctions) ->
+    ResourceCalls = find_resource_calls(Body, OtherFunctions),
     Outcomes = find_outcomes(Body),
     {Name, ResourceCalls, Outcomes}.
 
-find_resource_calls([]) ->
+find_resource_calls([], _OtherFunctions) ->
     [];
 find_resource_calls([{call, _CallLine,
                       {atom, _AtomLine, resource_call},
                       [{atom, _NameLine, Name}]}
-                     |Rest]) ->
-    [Name|find_resource_calls(Rest)];
-find_resource_calls([List|Rest]) when is_list(List) ->
-    find_resource_calls(List)++find_resource_calls(Rest);
-find_resource_calls([Tuple|Rest]) when is_tuple(Tuple) ->
-    find_resource_calls(tuple_to_list(Tuple))++find_resource_calls(Rest);
-find_resource_calls([_|Rest]) ->
-    find_resource_calls(Rest).
+                     |Rest],
+                    OtherFunctions) ->
+    [Name|find_resource_calls(Rest, OtherFunctions)];
+find_resource_calls([{call, _CallLine,
+                      {atom, _AtomLine, respond},
+                      Args}
+                     |Rest],
+                    OtherFunctions) ->
+    ['RESPOND'|(find_resource_calls(Args, OtherFunctions)
+                ++find_resource_calls(Rest, OtherFunctions))];
+find_resource_calls([{call, _CallLine,
+                      {atom, _AtomLine, FunctionName},
+                      Args}
+                     |Rest],
+                    OtherFunctions)
+  when FunctionName /= d,
+       FunctionName /= decision_test,
+       FunctionName /= decision_test_fn,
+       FunctionName /= respond, %% makes lots of resource calls, actually
+       FunctionName /= make_encoder_stream, %% harmless but recursive
+       %% known harmless (builtins & such)
+       FunctionName /= get,
+       FunctionName /= put,
+       FunctionName /= wrcall ->
+    io:format("Finding ~p~n", [FunctionName]),
+    case lists:keyfind(FunctionName, 3, OtherFunctions) of
+        {function, _Line, FunctionName, _Arity, FunctionClauses} ->
+            lists:flatten([ find_resource_calls(Body, OtherFunctions)
+                            || {clause, _ClauseLine, _Args, _Guards, Body}
+                                   <- FunctionClauses ]);
+        _Builtin ->
+            []
+    end
+        ++find_resource_calls(Args, OtherFunctions)
+        ++find_resource_calls(Rest, OtherFunctions);
+find_resource_calls([List|Rest], OF) when is_list(List) ->
+    find_resource_calls(List, OF)++find_resource_calls(Rest, OF);
+find_resource_calls([Tuple|Rest], OF) when is_tuple(Tuple) ->
+    find_resource_calls(tuple_to_list(Tuple), OF)
+        ++find_resource_calls(Rest, OF);
+find_resource_calls([_|Rest], OF) ->
+    find_resource_calls(Rest, OF).
 
 find_outcomes([]) ->
     [];
@@ -109,7 +144,8 @@ dot(Parse, Filename) ->
     [ Write(io_lib:format("~p_label [label=<~s> shape=none]~n",
                           [Decision,
                            string:join(
-                             [atom_to_list(RC) || RC <- ResourceCalls],
+                             [atom_to_list(RC) || RC <- ResourceCalls,
+                                                  RC /= 'RESPOND'],
                              "<BR/>")]))
       || {Decision, ResourceCalls, _Outcomes} <- Combined,
          ResourceCalls /= [] ],
